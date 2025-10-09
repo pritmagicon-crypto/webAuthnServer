@@ -19,10 +19,26 @@ const origin = process.env.ORIGIN || 'http://localhost:5173';
 
 const users = new Map(); // in-memory, to be replaced with DB
 
+app.get('/user/:loginId/webauthn-status', (req, res) => {
+    const { loginId } = req.params;
+    const user = users.get(loginId);
+
+    if (!user) {
+        return res.status(404).json({ message: 'User not found', registered: false });
+    }
+
+    const registered = !!user.credential;
+    res.json({
+        loginId,
+        registered,
+        hasCredential: registered,
+    });
+});
+
 app.post('/register/options', async (req, res) => {
     const { username } = req.body;
     if (!username) return res.status(400).send('Username required');
-    
+
     const userId = isoUint8Array.fromUTF8String(username);
 
     const options = await generateRegistrationOptions({
@@ -30,8 +46,8 @@ app.post('/register/options', async (req, res) => {
         rpID,
         userID: userId,
         userName: username,
-        attestationType: 'none',
-        authenticatorSelection: {authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'preferred' },
+        attestationType: 'direct',
+        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'preferred' },
     });
 
     users.set(username, {
